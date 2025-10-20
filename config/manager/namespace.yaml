@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argo-ephemeral-operator-system
+  labels:
+    app.kubernetes.io/name: argo-ephemeral-operator
+

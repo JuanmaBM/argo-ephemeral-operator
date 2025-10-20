@@ -1,0 +1,18 @@
+# Project metadata for Kubebuilder
+domain: argo.io
+layout:
+- go.kubebuilder.io/v3
+projectName: argo-ephemeral-operator
+repo: github.com/jbarea/argo-ephemeral-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: argo.io
+  group: ephemeral
+  kind: EphemeralApplication
+  path: github.com/jbarea/argo-ephemeral-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"
+

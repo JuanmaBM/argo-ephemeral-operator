@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-ephemeral-operator-controller-manager
+  namespace: argo-ephemeral-operator-system
+  labels:
+    app.kubernetes.io/name: argo-ephemeral-operator
+    app.kubernetes.io/component: manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-ephemeral-operator
+      app.kubernetes.io/component: manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-ephemeral-operator
+        app.kubernetes.io/component: manager
+    spec:
+      serviceAccountName: argo-ephemeral-operator-controller-manager
+      containers:
+      - name: manager
+        image: argo-ephemeral-operator:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /manager
+        args:
+        - --leader-elect
+        env:
+        - name: ARGO_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-server
+        - name: ARGO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-token
+        - name: ARGO_NAMESPACE
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-namespace
+              optional: true
+        - name: ARGO_INSECURE
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-insecure
+              optional: true
+        - name: RECONCILE_INTERVAL
+          value: "5m"
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 10
+

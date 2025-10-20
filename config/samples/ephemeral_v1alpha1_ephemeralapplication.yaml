@@ -1,0 +1,28 @@
+apiVersion: ephemeral.argo.io/v1alpha1
+kind: EphemeralApplication
+metadata:
+  name: sample-ephemeral-app
+  namespace: default
+spec:
+  # Git repository URL containing the application manifests
+  repoURL: https://github.com/argoproj/argocd-example-apps.git
+  
+  # Path within the repository
+  path: guestbook
+  
+  # Git revision (branch, tag, or commit SHA)
+  targetRevision: HEAD
+  
+  # Expiration date in RFC3339 format
+  # This example expires in 7 days from creation
+  expirationDate: "2025-10-27T23:59:59Z"
+  
+  # Namespace prefix (optional, defaults to "ephemeral")
+  namespacePrefix: demo
+  
+  # Sync policy (optional)
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
