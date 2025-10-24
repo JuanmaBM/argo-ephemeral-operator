@@ -80,17 +80,17 @@ func main() {
 	}
 
 	// Create ArgoCD client
-	argoClient := argocd.NewClient(mgr.GetClient(), cfg.ArgoNamespace)
-
-	// Create Application builder
-	appBuilder := argocd.NewApplicationBuilder(scheme)
+	argoClient, err := argocd.NewClient(cfg.ArgoServer, cfg.ArgoPort, cfg.ArgoUsername, cfg.ArgoPassword, cfg.ArgoInsecure)
+	if err != nil {
+		setupLog.Error(err, "unable to create ArgoCD client")
+		os.Exit(1)
+	}
 
 	// Setup reconciler
 	if err = (&controller.EphemeralApplicationReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		ArgoClient:    argoClient,
-		AppBuilder:    appBuilder,
 		Config:        cfg,
 		NameGenerator: &controller.DefaultNameGenerator{},
 	}).SetupWithManager(mgr); err != nil {

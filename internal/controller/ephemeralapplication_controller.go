@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	ephemeralv1alpha1 "github.com/jbarea/argo-ephemeral-operator/api/v1alpha1"
 	"github.com/jbarea/argo-ephemeral-operator/internal/argocd"
 	"github.com/jbarea/argo-ephemeral-operator/internal/config"
@@ -28,7 +30,6 @@ type EphemeralApplicationReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	ArgoClient    argocd.Client
-	AppBuilder    *argocd.ApplicationBuilder
 	Config        *config.Config
 	NameGenerator NameGenerator
 }
@@ -116,14 +117,37 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 	}
 
 	// Build and create ArgoCD Application
-	argoApp := r.AppBuilder.BuildApplication(ephApp, namespace, r.Config.ArgoNamespace)
+	argoApp, err := r.ArgoClient.CreateApplication(ctx, &application.ApplicationCreateRequest{
+		Application: &v1alpha1.Application{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ephApp.Name,
+			},
+			Spec: v1alpha1.ApplicationSpec{
+				Project: "default",
+				Source: &v1alpha1.ApplicationSource{
+					RepoURL:        ephApp.Spec.RepoURL,
+					Path:           ephApp.Spec.Path,
+					TargetRevision: ephApp.Spec.TargetRevision,
+				},
+				Destination: v1alpha1.ApplicationDestination{
+					Namespace: namespace,
+					Server:    "https://kubernetes.default.svc",
+				},
+				SyncPolicy: &v1alpha1.SyncPolicy{
+					Automated: &v1alpha1.SyncPolicyAutomated{
+						Prune:    true,
+						SelfHeal: true,
+					},
+				},
+			},
+		},
+	})
 
-	if err := r.ArgoClient.CreateApplication(ctx, argoApp); err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil {
 		logger.Error(err, "failed to create ArgoCD application")
 		return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "Failed to create ArgoCD application", err)
 	}
 
-	// Update status to Creating
 	ephApp.Status.Phase = ephemeralv1alpha1.PhaseCreating
 	ephApp.Status.Namespace = namespace
 	ephApp.Status.ArgoApplicationName = argoApp.Name
@@ -143,7 +167,11 @@ func (r *EphemeralApplicationReconciler) handleCreatingPhase(ctx context.Context
 	logger.Info("handling creating phase")
 
 	// Check if ArgoCD Application exists and is synced
-	argoApp, err := r.ArgoClient.GetApplication(ctx, r.Config.ArgoNamespace, ephApp.Status.ArgoApplicationName)
+	appQuery := application.ApplicationQuery{
+		Name:         &ephApp.Status.ArgoApplicationName,
+		AppNamespace: &ephApp.Status.Namespace,
+	}
+	argoApp, err := r.ArgoClient.GetApplication(ctx, appQuery)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "ArgoCD application not found", err)
@@ -176,7 +204,11 @@ func (r *EphemeralApplicationReconciler) handleActivePhase(ctx context.Context, 
 	logger.Info("handling active phase")
 
 	// Verify ArgoCD Application still exists and is healthy
-	argoApp, err := r.ArgoClient.GetApplication(ctx, r.Config.ArgoNamespace, ephApp.Status.ArgoApplicationName)
+	appQuery := application.ApplicationQuery{
+		Name:         &ephApp.Status.ArgoApplicationName,
+		AppNamespace: &ephApp.Status.Namespace,
+	}
+	argoApp, err := r.ArgoClient.GetApplication(ctx, appQuery)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "ArgoCD application disappeared", err)
@@ -232,7 +264,7 @@ func (r *EphemeralApplicationReconciler) handleDeletion(ctx context.Context, eph
 		// Delete ArgoCD Application
 		if ephApp.Status.ArgoApplicationName != "" {
 			logger.Info("deleting ArgoCD application", "name", ephApp.Status.ArgoApplicationName)
-			if err := r.ArgoClient.DeleteApplication(ctx, r.Config.ArgoNamespace, ephApp.Status.ArgoApplicationName); err != nil {
+			if err := r.ArgoClient.DeleteApplication(ctx, ephApp.Status.ArgoApplicationName, ephApp.Status.Namespace); err != nil {
 				if !errors.IsNotFound(err) {
 					logger.Error(err, "failed to delete ArgoCD application")
 					return ctrl.Result{}, err

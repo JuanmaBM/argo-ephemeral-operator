@@ -11,7 +11,9 @@ import (
 type Config struct {
 	// ArgoCD configuration
 	ArgoServer    string
-	ArgoToken     string
+	ArgoPort      string
+	ArgoUsername  string
+	ArgoPassword  string
 	ArgoNamespace string
 	ArgoInsecure  bool
 
@@ -28,8 +30,10 @@ func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		// ArgoCD defaults
 		ArgoServer:    getEnvOrDefault("ARGO_SERVER", "argocd-server.argocd.svc.cluster.local"),
-		ArgoToken:     os.Getenv("ARGO_TOKEN"),
 		ArgoNamespace: getEnvOrDefault("ARGO_NAMESPACE", "argocd"),
+		ArgoPort:      getEnvOrDefault("ARGO_PORT", "8080"),
+		ArgoUsername:  getEnvOrDefault("ARGO_USERNAME", "admin"),
+		ArgoPassword:  getEnvOrDefault("ARGO_PASSWORD", "admin"),
 		ArgoInsecure:  getEnvBoolOrDefault("ARGO_INSECURE", true),
 
 		// Operator defaults
@@ -52,8 +56,11 @@ func (c *Config) Validate() error {
 	if c.ArgoServer == "" {
 		return fmt.Errorf("ARGO_SERVER is required")
 	}
-	if c.ArgoToken == "" {
-		return fmt.Errorf("ARGO_TOKEN is required")
+	if c.ArgoUsername == "" {
+		return fmt.Errorf("ARGO_USERNAME is required")
+	}
+	if c.ArgoPassword == "" {
+		return fmt.Errorf("ARGO_PASSWORD is required")
 	}
 	if c.ArgoNamespace == "" {
 		return fmt.Errorf("ARGO_NAMESPACE is required")

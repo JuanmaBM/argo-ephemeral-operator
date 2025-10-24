@@ -1,214 +1,258 @@
 package argocd
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	ephemeralv1alpha1 "github.com/jbarea/argo-ephemeral-operator/api/v1alpha1"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 )
-
-// ArgoCD Application types (simplified for this implementation)
-// In production, you would import these from github.com/argoproj/argo-cd/v2
-type Application struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Spec              ApplicationSpec   `json:"spec"`
-	Status            ApplicationStatus `json:"status,omitempty"`
-}
-
-type ApplicationSpec struct {
-	Project     string                 `json:"project"`
-	Source      *ApplicationSource     `json:"source,omitempty"`
-	Destination ApplicationDestination `json:"destination"`
-	SyncPolicy  *SyncPolicy            `json:"syncPolicy,omitempty"`
-}
-
-type ApplicationSource struct {
-	RepoURL        string `json:"repoURL"`
-	Path           string `json:"path,omitempty"`
-	TargetRevision string `json:"targetRevision,omitempty"`
-}
-
-type ApplicationDestination struct {
-	Server    string `json:"server,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-}
-
-type SyncPolicy struct {
-	Automated   *SyncPolicyAutomated `json:"automated,omitempty"`
-	SyncOptions SyncOptions          `json:"syncOptions,omitempty"`
-}
-
-type SyncPolicyAutomated struct {
-	Prune    bool `json:"prune,omitempty"`
-	SelfHeal bool `json:"selfHeal,omitempty"`
-}
-
-type SyncOptions []string
-
-type ApplicationStatus struct {
-	Sync   SyncStatus   `json:"sync,omitempty"`
-	Health HealthStatus `json:"health,omitempty"`
-}
-
-type SyncStatus struct {
-	Status string `json:"status,omitempty"`
-}
-
-type HealthStatus struct {
-	Status string `json:"status,omitempty"`
-}
 
 // Client defines the interface for interacting with ArgoCD
 type Client interface {
+	DoRequestWithRetry(requestFunc func(appClient application.ApplicationServiceClient) error) error
 	// CreateApplication creates an ArgoCD Application
-	CreateApplication(ctx context.Context, app *Application) error
+	CreateApplication(ctx context.Context, newApp *application.ApplicationCreateRequest) (*v1alpha1.Application, error)
 	// GetApplication retrieves an ArgoCD Application
-	GetApplication(ctx context.Context, namespace, name string) (*Application, error)
-	// DeleteApplication deletes an ArgoCD Application
-	DeleteApplication(ctx context.Context, namespace, name string) error
-	// UpdateApplication updates an ArgoCD Application
-	UpdateApplication(ctx context.Context, app *Application) error
+	GetApplication(ctx context.Context, query application.ApplicationQuery) (*v1alpha1.Application, error)
+	// GetApplication retrieves an ArgoCD Application
+	GetApplications(ctx context.Context) (*v1alpha1.ApplicationList, error)
+	// // DeleteApplication deletes an ArgoCD Application
+	DeleteApplication(ctx context.Context, name string, namespace string) error
+	// // UpdateApplication updates an ArgoCD Application
+	// UpdateApplication(ctx context.Context, app *v1alpha1.Application) error
 }
 
 // clientImpl implements the Client interface
 type clientImpl struct {
-	k8sClient client.Client
-	namespace string
+	argocdClient apiclient.Client
+	tokenLock    sync.Mutex
+	username     string
+	password     string
+	serverAddr   string
+	insecure     bool
 }
 
-// NewClient creates a new ArgoCD client
-func NewClient(k8sClient client.Client, namespace string) Client {
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+func getAuthToken(serverAddr string, username string, password string) (string, error) {
+	loginURL := serverAddr + "/api/v1/session"
+	loginRequest := LoginRequest{
+		Username: username,
+		Password: password,
+	}
+
+	reqBody, err := json.Marshal(loginRequest)
+	if err != nil {
+		return "", err
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
+	resp, err := client.Post(loginURL, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to login: %s", string(bodyBytes))
+	}
+
+	var loginResponse LoginResponse
+	if err := json.NewDecoder(resp.Body).Decode(&loginResponse); err != nil {
+		return "", err
+	}
+
+	return loginResponse.Token, nil
+}
+
+func createArgcdClient(serverAddr string, authToken string, insecure bool) (apiclient.Client, error) {
+
+	clientOpts := &apiclient.ClientOptions{
+		ServerAddr: serverAddr,
+		AuthToken:  authToken,
+		Insecure:   insecure,
+		GRPCWeb:    false,
+		PlainText:  false,
+	}
+
+	client, err := apiclient.NewClient(clientOpts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func NewClient(serverAddr string, port string, username string, password string, insecure bool) (Client, error) {
+
+	authToken, err := getAuthToken("https://"+serverAddr, username, password)
+	if err != nil {
+		log.Fatalf("Client can't get Authorization Token from ArgoCD with the crendetials provided")
+		return nil, err
+	}
+
+	client, err := createArgcdClient(serverAddr+":"+port, authToken, insecure)
+	if err != nil {
+		log.Fatalf("Failed to create ArgoCD client: %v", err)
+		return nil, err
+	}
+
 	return &clientImpl{
-		k8sClient: k8sClient,
-		namespace: namespace,
-	}
+		argocdClient: client,
+		username:     username,
+		password:     password,
+		serverAddr:   serverAddr,
+		insecure:     insecure,
+	}, nil
 }
 
-// CreateApplication creates an ArgoCD Application
-func (c *clientImpl) CreateApplication(ctx context.Context, app *Application) error {
-	if err := c.k8sClient.Create(ctx, app); err != nil {
-		return fmt.Errorf("failed to create ArgoCD application: %w", err)
+func (c *clientImpl) DoRequestWithRetry(requestFunc func(appClient application.ApplicationServiceClient) error) error {
+
+	conn, appClient, err := c.argocdClient.NewApplicationClient()
+	if err != nil {
+		return fmt.Errorf("failed to open a connection to ArgoCD server: %v", err)
 	}
-	return nil
-}
+	defer conn.Close()
 
-// GetApplication retrieves an ArgoCD Application
-func (c *clientImpl) GetApplication(ctx context.Context, namespace, name string) (*Application, error) {
-	app := &Application{}
-	if err := c.k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, app); err != nil {
-		return nil, fmt.Errorf("failed to get ArgoCD application: %w", err)
-	}
-	return app, nil
-}
+	err = requestFunc(appClient)
 
-// DeleteApplication deletes an ArgoCD Application
-func (c *clientImpl) DeleteApplication(ctx context.Context, namespace, name string) error {
-	app := &Application{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-	}
-	if err := c.k8sClient.Delete(ctx, app); err != nil {
-		return fmt.Errorf("failed to delete ArgoCD application: %w", err)
-	}
-	return nil
-}
+	if err != nil && isUnauthorized(err) {
 
-// UpdateApplication updates an ArgoCD Application
-func (c *clientImpl) UpdateApplication(ctx context.Context, app *Application) error {
-	if err := c.k8sClient.Update(ctx, app); err != nil {
-		return fmt.Errorf("failed to update ArgoCD application: %w", err)
-	}
-	return nil
-}
+		c.tokenLock.Lock()
+		defer c.tokenLock.Unlock()
 
-// ApplicationBuilder builds ArgoCD Applications from EphemeralApplications
-type ApplicationBuilder struct {
-	scheme *runtime.Scheme
-}
-
-// NewApplicationBuilder creates a new ApplicationBuilder
-func NewApplicationBuilder(scheme *runtime.Scheme) *ApplicationBuilder {
-	return &ApplicationBuilder{
-		scheme: scheme,
-	}
-}
-
-// BuildApplication builds an ArgoCD Application from an EphemeralApplication
-func (b *ApplicationBuilder) BuildApplication(
-	ephApp *ephemeralv1alpha1.EphemeralApplication,
-	namespace string,
-	argoNamespace string,
-) *Application {
-	appName := fmt.Sprintf("ephemeral-%s", ephApp.Name)
-
-	app := &Application{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      appName,
-			Namespace: argoNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "argo-ephemeral-operator",
-				"ephemeral.argo.io/owner":      ephApp.Name,
-			},
-		},
-		Spec: ApplicationSpec{
-			Project: "default",
-			Source: &ApplicationSource{
-				RepoURL:        ephApp.Spec.RepoURL,
-				Path:           ephApp.Spec.Path,
-				TargetRevision: b.getTargetRevision(ephApp),
-			},
-			Destination: ApplicationDestination{
-				Server:    "https://kubernetes.default.svc",
-				Namespace: namespace,
-			},
-			SyncPolicy: b.buildSyncPolicy(ephApp),
-		},
-	}
-
-	return app
-}
-
-// getTargetRevision returns the target revision or default
-func (b *ApplicationBuilder) getTargetRevision(ephApp *ephemeralv1alpha1.EphemeralApplication) string {
-	if ephApp.Spec.TargetRevision != "" {
-		return ephApp.Spec.TargetRevision
-	}
-	return "HEAD"
-}
-
-// buildSyncPolicy builds the sync policy from the EphemeralApplication
-func (b *ApplicationBuilder) buildSyncPolicy(ephApp *ephemeralv1alpha1.EphemeralApplication) *SyncPolicy {
-	if ephApp.Spec.SyncPolicy == nil {
-		return &SyncPolicy{
-			Automated: &SyncPolicyAutomated{
-				Prune:    true,
-				SelfHeal: true,
-			},
-			SyncOptions: SyncOptions{
-				"CreateNamespace=true",
-			},
+		authToken, err := getAuthToken(c.serverAddr, c.username, c.password)
+		if err != nil {
+			return fmt.Errorf("error renewing auth token: %v", err)
 		}
-	}
 
-	policy := &SyncPolicy{
-		SyncOptions: SyncOptions{
-			"CreateNamespace=true",
-		},
-	}
-
-	if ephApp.Spec.SyncPolicy.Automated != nil {
-		policy.Automated = &SyncPolicyAutomated{
-			Prune:    ephApp.Spec.SyncPolicy.Automated.Prune,
-			SelfHeal: ephApp.Spec.SyncPolicy.Automated.SelfHeal,
+		c.argocdClient, err = createArgcdClient(c.serverAddr, authToken, c.insecure)
+		if err != nil {
+			return fmt.Errorf("error recreating ArgoCD client with new token: %v", err)
 		}
+
+		err = requestFunc(appClient)
 	}
 
-	return policy
+	return err
+}
+
+func (c *clientImpl) GetApplications(ctx context.Context) (*v1alpha1.ApplicationList, error) {
+
+	var apps *v1alpha1.ApplicationList
+	err := c.DoRequestWithRetry(func(appClient application.ApplicationServiceClient) error {
+		appList, err := appClient.List(ctx, &application.ApplicationQuery{})
+		if err != nil {
+			return fmt.Errorf("failed to get all applications: %v", err)
+		}
+		apps = appList
+		return err
+	})
+
+	return apps, err
+
+}
+
+func (c *clientImpl) CreateApplication(ctx context.Context, newApp *application.ApplicationCreateRequest) (*v1alpha1.Application, error) {
+
+	if newApp == nil {
+		return nil, errors.New("application must be defined")
+	}
+
+	var applicationCreated *v1alpha1.Application
+	err := c.DoRequestWithRetry(func(appClient application.ApplicationServiceClient) error {
+		app, err := appClient.Create(ctx, newApp)
+		if err != nil {
+			return fmt.Errorf("application can not be created: %v", err)
+		}
+		applicationCreated = app
+		return err
+	})
+
+	return applicationCreated, err
+}
+
+func (c *clientImpl) GetApplication(ctx context.Context, query application.ApplicationQuery) (*v1alpha1.Application, error) {
+
+	if isEmpty(query) {
+		return nil, errors.New("application name parameter must be defined")
+	}
+
+	var foundApp *v1alpha1.Application
+	err := c.DoRequestWithRetry(func(appClient application.ApplicationServiceClient) error {
+		app, err := appClient.Get(ctx, &query)
+		if err != nil {
+			log.Fatalf("Application not found with query: %v", query)
+		}
+		foundApp = app
+		return nil
+	})
+
+	return foundApp, err
+}
+
+func (c *clientImpl) DeleteApplication(ctx context.Context, name string, namespace string) error {
+
+	if name == "" || namespace == "" {
+		return errors.New("application name and namespace must be defined")
+	}
+
+	return c.DoRequestWithRetry(func(appClient application.ApplicationServiceClient) error {
+		_, err := appClient.Delete(ctx, &application.ApplicationDeleteRequest{
+			Name:         &name,
+			AppNamespace: &namespace,
+		})
+		return err
+	})
+}
+
+func isEmpty(query application.ApplicationQuery) bool {
+	fields := []interface{}{
+		query.Name,
+		query.AppNamespace,
+		query.Refresh,
+		query.Repo,
+		query.ResourceVersion,
+		query.Selector,
+		query.Project,
+		query.Projects,
+	}
+
+	for _, field := range fields {
+		if field != nil {
+			return true
+		}
+
+	}
+
+	return false
+}
+
+func isUnauthorized(err error) bool {
+	if err != nil && strings.Contains(err.Error(), "401") {
+		return true
+	}
+	return false
 }
