@@ -54,10 +54,10 @@ kubectl apply -f config/crd/bases/ephemeral.argo.io_ephemeralapplications.yaml
 
 ### 2. Create ArgoCD Access Secret
 
-First, generate an ArgoCD token:
+First, get your ArgoCD admin password:
 
 ```bash
-argocd account generate-token --account <account-name>
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
 ```
 
 Create the secret with your ArgoCD credentials:
@@ -65,7 +65,9 @@ Create the secret with your ArgoCD credentials:
 ```bash
 kubectl create secret generic argo-ephemeral-operator-config \
   --from-literal=argo-server="argocd-server.argocd.svc.cluster.local" \
-  --from-literal=argo-token="YOUR_ARGOCD_TOKEN" \
+  --from-literal=argo-port="443" \
+  --from-literal=argo-username="admin" \
+  --from-literal=argo-password="YOUR_ARGOCD_PASSWORD" \
   --from-literal=argo-namespace="argocd" \
   --from-literal=argo-insecure="true" \
   -n argo-ephemeral-operator-system
@@ -173,7 +175,9 @@ The operator is configured through environment variables:
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `ARGO_SERVER` | ArgoCD server address | `argocd-server.argocd.svc.cluster.local` | Yes |
-| `ARGO_TOKEN` | ArgoCD authentication token | - | Yes |
+| `ARGO_PORT` | ArgoCD server port | `443` | No |
+| `ARGO_USERNAME` | ArgoCD username | `admin` | Yes |
+| `ARGO_PASSWORD` | ArgoCD password | - | Yes |
 | `ARGO_NAMESPACE` | Namespace where ArgoCD is installed | `argocd` | No |
 | `ARGO_INSECURE` | Skip TLS verification | `true` | No |
 | `RECONCILE_INTERVAL` | How often to check application status | `5m` | No |
@@ -220,7 +224,9 @@ make docker-push IMG=your-registry/argo-ephemeral-operator:tag
 ```bash
 # Set required environment variables
 export ARGO_SERVER="argocd-server.argocd.svc.cluster.local"
-export ARGO_TOKEN="your-argocd-token"
+export ARGO_PORT="443"
+export ARGO_USERNAME="admin"
+export ARGO_PASSWORD="your-argocd-password"
 export ARGO_NAMESPACE="argocd"
 
 # Run the operator
@@ -328,13 +334,3 @@ Contributions are welcome! This project follows:
 ## License
 
 See [LICENSE](LICENSE) file for details.
-
-## Roadmap
-
-- [ ] Webhook validation for EphemeralApplication resources
-- [ ] Metrics and monitoring integration (Prometheus)
-- [ ] Support for Helm charts in addition to raw manifests
-- [ ] Notification system (Slack, Email) before expiration
-- [ ] Resource quota management for ephemeral namespaces
-- [ ] Web UI for managing ephemeral environments
-- [ ] Multi-cluster support
