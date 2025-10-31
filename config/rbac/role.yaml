@@ -4,51 +4,9 @@ metadata:
   name: argo-ephemeral-operator-manager-role
 rules:
 - apiGroups:
-  - ""
+  - "*"
   resources:
-  - namespaces
+  - "*"
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - applications
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ephemeral.argo.io
-  resources:
-  - ephemeralapplications
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ephemeral.argo.io
-  resources:
-  - ephemeralapplications/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ephemeral.argo.io
-  resources:
-  - ephemeralapplications/status
-  verbs:
-  - get
-  - patch
-  - update
+  - "*"
 

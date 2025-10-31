@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -169,7 +170,7 @@ func (r *EphemeralApplicationReconciler) handleCreatingPhase(ctx context.Context
 	// Check if ArgoCD Application exists and is synced
 	appQuery := application.ApplicationQuery{
 		Name:         &ephApp.Status.ArgoApplicationName,
-		AppNamespace: &ephApp.Status.Namespace,
+		AppNamespace: &r.Config.ArgoNamespace,
 	}
 	argoApp, err := r.ArgoClient.GetApplication(ctx, appQuery)
 	if err != nil {
@@ -206,7 +207,7 @@ func (r *EphemeralApplicationReconciler) handleActivePhase(ctx context.Context, 
 	// Verify ArgoCD Application still exists and is healthy
 	appQuery := application.ApplicationQuery{
 		Name:         &ephApp.Status.ArgoApplicationName,
-		AppNamespace: &ephApp.Status.Namespace,
+		AppNamespace: &r.Config.ArgoNamespace,
 	}
 	argoApp, err := r.ArgoClient.GetApplication(ctx, appQuery)
 	if err != nil {
@@ -264,8 +265,9 @@ func (r *EphemeralApplicationReconciler) handleDeletion(ctx context.Context, eph
 		// Delete ArgoCD Application
 		if ephApp.Status.ArgoApplicationName != "" {
 			logger.Info("deleting ArgoCD application", "name", ephApp.Status.ArgoApplicationName)
-			if err := r.ArgoClient.DeleteApplication(ctx, ephApp.Status.ArgoApplicationName, ephApp.Status.Namespace); err != nil {
-				if !errors.IsNotFound(err) {
+			if err := r.ArgoClient.DeleteApplication(ctx, ephApp.Status.ArgoApplicationName, r.Config.ArgoNamespace); err != nil {
+				// FIXME: ArgoCD is return a 403 PermissionDenied error when the application does not exist, but we should improve this error handling.
+				if !errors.IsNotFound(err) && !strings.Contains(err.Error(), "PermissionDenied") {
 					logger.Error(err, "failed to delete ArgoCD application")
 					return ctrl.Result{}, err
 				}

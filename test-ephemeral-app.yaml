@@ -1,0 +1,27 @@
+apiVersion: ephemeral.argo.io/v1alpha1
+kind: EphemeralApplication
+metadata:
+  name: test-guestbook
+  namespace: default
+spec:
+  # Repositorio de ejemplo de ArgoCD
+  repoURL: https://github.com/argoproj/argocd-example-apps.git
+  
+  # Path del guestbook
+  path: guestbook
+  
+  # Branch o tag
+  targetRevision: HEAD
+  
+  # Expira en 5 minutos
+  expirationDate: "2025-10-31T15:20:00Z"
+  
+  # Prefijo del namespace
+  namespacePrefix: test
+  
+  # Sincronización automática
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+

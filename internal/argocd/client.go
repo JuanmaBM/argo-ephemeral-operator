@@ -29,8 +29,6 @@ type Client interface {
 	GetApplications(ctx context.Context) (*v1alpha1.ApplicationList, error)
 	// // DeleteApplication deletes an ArgoCD Application
 	DeleteApplication(ctx context.Context, name string, namespace string) error
-	// // UpdateApplication updates an ArgoCD Application
-	// UpdateApplication(ctx context.Context, app *v1alpha1.Application) error
 }
 
 // clientImpl implements the Client interface
@@ -221,8 +219,9 @@ func (c *clientImpl) DeleteApplication(ctx context.Context, name string, namespa
 
 	return c.DoRequestWithRetry(func(appClient application.ApplicationServiceClient) error {
 		_, err := appClient.Delete(ctx, &application.ApplicationDeleteRequest{
-			Name:         &name,
-			AppNamespace: &namespace,
+			Name: &name,
+			// FIXME: AppNamespace is not working as expected, we should investigate why.
+			//AppNamespace: &namespace,
 		})
 		return err
 	})
@@ -242,12 +241,12 @@ func isEmpty(query application.ApplicationQuery) bool {
 
 	for _, field := range fields {
 		if field != nil {
-			return true
+			return false
 		}
 
 	}
 
-	return false
+	return true
 }
 
 func isUnauthorized(err error) bool {

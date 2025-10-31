@@ -21,7 +21,7 @@ spec:
       serviceAccountName: argo-ephemeral-operator-controller-manager
       containers:
       - name: manager
-        image: argo-ephemeral-operator:latest
+        image: quay.io/jbarea/argo-ephemeral-operator:0.1.5
         imagePullPolicy: IfNotPresent
         command:
         - /manager
@@ -33,11 +33,22 @@ spec:
             secretKeyRef:
               name: argo-ephemeral-operator-config
               key: argo-server
-        - name: ARGO_TOKEN
+        - name: ARGO_PORT
           valueFrom:
             secretKeyRef:
               name: argo-ephemeral-operator-config
-              key: argo-token
+              key: argo-port
+              optional: true
+        - name: ARGO_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-username
+        - name: ARGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: argo-ephemeral-operator-config
+              key: argo-password
         - name: ARGO_NAMESPACE
           valueFrom:
             secretKeyRef:
@@ -59,18 +70,6 @@ spec:
         - containerPort: 8081
           name: health
           protocol: TCP
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: health
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: health
-          initialDelaySeconds: 5
-          periodSeconds: 10
         resources:
           limits:
             cpu: 500m
