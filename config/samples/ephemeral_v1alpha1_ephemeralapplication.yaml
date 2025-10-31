@@ -17,8 +17,8 @@ spec:
   # This example expires in 7 days from creation
   expirationDate: "2025-10-27T23:59:59Z"
   
-  # Namespace prefix (optional, defaults to "ephemeral")
-  namespacePrefix: demo
+  # Namespace name (optional, if not specified auto-generates as ephemeral-{random})
+  namespaceName: demo-guestbook
   
   # Sync policy (optional)
   syncPolicy:

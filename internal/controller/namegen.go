@@ -2,33 +2,46 @@ package controller
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 // DefaultNameGenerator is the default implementation of NameGenerator
-type DefaultNameGenerator struct{}
+type DefaultNameGenerator struct {
+	rnd *rand.Rand
+}
 
-// GenerateNamespace generates a namespace name with prefix and suffix
-func (g *DefaultNameGenerator) GenerateNamespace(prefix, suffix string) string {
-	// Sanitize suffix to be DNS compliant
-	sanitized := strings.ToLower(suffix)
-	sanitized = strings.ReplaceAll(sanitized, "_", "-")
+// NewDefaultNameGenerator creates a new DefaultNameGenerator with random seed
+func NewDefaultNameGenerator() *DefaultNameGenerator {
+	return &DefaultNameGenerator{
+		rnd: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
 
-	// Ensure total length is <= 63 characters (Kubernetes limit)
-	maxLength := 63
-	combined := fmt.Sprintf("%s-%s", prefix, sanitized)
+// GenerateNamespace generates a namespace name
+// If namespaceName is provided, uses it directly
+// Otherwise generates "ephemeral-{random}"
+func (g *DefaultNameGenerator) GenerateNamespace(namespaceName, _ string) string {
+	if namespaceName != "" {
+		// Use provided name directly, sanitize it
+		sanitized := strings.ToLower(namespaceName)
+		sanitized = strings.ReplaceAll(sanitized, "_", "-")
 
-	if len(combined) > maxLength {
-		// Truncate suffix to fit
-		allowedSuffixLen := maxLength - len(prefix) - 1 // -1 for the dash
-		if allowedSuffixLen > 0 {
-			sanitized = sanitized[:allowedSuffixLen]
-			combined = fmt.Sprintf("%s-%s", prefix, sanitized)
-		} else {
-			// If prefix itself is too long, just use it truncated
-			combined = prefix[:maxLength]
+		// Ensure it's <= 63 characters
+		if len(sanitized) > 63 {
+			sanitized = sanitized[:63]
 		}
+
+		return sanitized
 	}
 
-	return combined
+	// Generate random suffix (7 characters)
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	suffix := make([]byte, 7)
+	for i := range suffix {
+		suffix[i] = charset[g.rnd.Intn(len(charset))]
+	}
+
+	return fmt.Sprintf("ephemeral-%s", string(suffix))
 }

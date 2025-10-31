@@ -2,7 +2,6 @@ apiVersion: ephemeral.argo.io/v1alpha1
 kind: EphemeralApplication
 metadata:
   name: test-guestbook
-  namespace: default
 spec:
   # Repositorio de ejemplo de ArgoCD
   repoURL: https://github.com/argoproj/argocd-example-apps.git
@@ -14,10 +13,10 @@ spec:
   targetRevision: HEAD
   
   # Expira en 5 minutos
-  expirationDate: "2025-10-31T15:20:00Z"
+  expirationDate: "2025-10-31T15:59:00Z"
   
-  # Prefijo del namespace
-  namespacePrefix: test
+  # Nombre del namespace (opcional, si no se especifica se genera automáticamente como ephemeral-{random})
+  # namespaceName: my-custom-namespace
   
   # Sincronización automática
   syncPolicy:

@@ -92,7 +92,7 @@ func main() {
 		Scheme:        mgr.GetScheme(),
 		ArgoClient:    argoClient,
 		Config:        cfg,
-		NameGenerator: &controller.DefaultNameGenerator{},
+		NameGenerator: controller.NewDefaultNameGenerator(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EphemeralApplication")
 		os.Exit(1)

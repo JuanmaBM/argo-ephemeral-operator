@@ -23,10 +23,10 @@ type EphemeralApplicationSpec struct {
 	// +kubebuilder:validation:Required
 	ExpirationDate metav1.Time `json:"expirationDate"`
 
-	// NamespacePrefix is the prefix for the ephemeral namespace
-	// The full namespace will be: {prefix}-{random-suffix}
-	// +kubebuilder:default:="ephemeral"
-	NamespacePrefix string `json:"namespacePrefix,omitempty"`
+	// NamespaceName is the name for the ephemeral namespace
+	// If not provided, a random name will be generated: ephemeral-{random}
+	// +optional
+	NamespaceName string `json:"namespaceName,omitempty"`
 
 	// SyncPolicy defines how the application should be synced
 	// +optional

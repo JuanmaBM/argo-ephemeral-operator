@@ -51,10 +51,9 @@ spec:
                   should be deleted Format: RFC3339 (e.g., "2024-12-31T23:59:59Z")'
                 format: date-time
                 type: string
-              namespacePrefix:
-                default: ephemeral
-                description: 'NamespacePrefix is the prefix for the ephemeral namespace
-                  The full namespace will be: {prefix}-{random-suffix}'
+              namespaceName:
+                description: 'NamespaceName is the name for the ephemeral namespace
+                  If not provided, a random name will be generated: ephemeral-{random}'
                 type: string
               path:
                 description: Path is the path within the Git repository

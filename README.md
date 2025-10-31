@@ -129,8 +129,8 @@ spec:
   # Expiration date (RFC3339 format)
   expirationDate: "2025-10-27T23:59:59Z"
   
-  # Optional: Namespace prefix (defaults to "ephemeral")
-  namespacePrefix: feature
+  # Optional: Namespace name (if not specified, auto-generates as ephemeral-{random})
+  namespaceName: feature-new-feature
   
   # Optional: Sync policy
   syncPolicy:
@@ -247,7 +247,7 @@ spec:
   path: deploy/kubernetes
   targetRevision: pull/123/head
   expirationDate: "2025-10-21T18:00:00Z"  # Expires in 6 hours
-  namespacePrefix: pr-test
+  namespaceName: pr-123-test
 ```
 
 ### Example 2: Demo Environment
@@ -262,7 +262,7 @@ spec:
   path: k8s
   targetRevision: v2.0.0
   expirationDate: "2025-10-25T23:59:59Z"  # Expires in 5 days
-  namespacePrefix: demo
+  namespaceName: customer-demo
   syncPolicy:
     automated:
       prune: true
@@ -281,7 +281,7 @@ spec:
   path: services/api
   targetRevision: dev/john-doe
   expirationDate: "2025-11-01T09:00:00Z"  # Expires in 2 weeks
-  namespacePrefix: dev
+  namespaceName: dev-john-doe
 ```
 
 ## Troubleshooting

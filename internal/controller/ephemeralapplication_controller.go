@@ -99,7 +99,7 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 	logger.Info("handling pending phase")
 
 	// Generate namespace name
-	namespace := r.NameGenerator.GenerateNamespace(r.getNamespacePrefix(ephApp), ephApp.Name)
+	namespace := r.NameGenerator.GenerateNamespace(ephApp.Spec.NamespaceName, "")
 
 	// Create namespace
 	ns := &corev1.Namespace{
@@ -303,14 +303,6 @@ func (r *EphemeralApplicationReconciler) handleDeletion(ctx context.Context, eph
 // isExpired checks if the application has expired
 func (r *EphemeralApplicationReconciler) isExpired(ephApp *ephemeralv1alpha1.EphemeralApplication) bool {
 	return time.Now().After(ephApp.Spec.ExpirationDate.Time)
-}
-
-// getNamespacePrefix returns the namespace prefix
-func (r *EphemeralApplicationReconciler) getNamespacePrefix(ephApp *ephemeralv1alpha1.EphemeralApplication) string {
-	if ephApp.Spec.NamespacePrefix != "" {
-		return ephApp.Spec.NamespacePrefix
-	}
-	return "ephemeral"
 }
 
 // updateStatusWithError updates the status with an error
