@@ -158,6 +158,23 @@ kubectl describe ephapp my-feature-branch
 kubectl get namespaces | grep ephemeral
 ```
 
+### Extending Expiration Time
+
+You can extend the expiration time of an ephemeral environment by updating the `expirationDate` field:
+
+```bash
+# Option 1: Edit interactively
+kubectl edit ephapp my-feature-branch
+
+# Option 2: Patch with new expiration date
+kubectl patch ephapp my-feature-branch --type=merge -p '{"spec":{"expirationDate":"2025-11-05T23:59:59Z"}}'
+
+# Verify the change
+kubectl get ephapp my-feature-branch -o jsonpath='{.spec.expirationDate}'
+```
+
+The controller will detect the change in the next reconciliation cycle and update the expiration accordingly.
+
 ### Deleting an Ephemeral Application
 
 Ephemeral applications are automatically deleted when they expire, but you can manually delete them:
