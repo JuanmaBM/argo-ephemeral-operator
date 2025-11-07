@@ -323,13 +323,29 @@ kubectl auth can-i create namespaces --as=system:serviceaccount:argo-ephemeral-o
 kubectl auth can-i create applications.argoproj.io --as=system:serviceaccount:argo-ephemeral-operator-system:argo-ephemeral-operator-controller-manager -n argocd
 ```
 
+## Project Structure
+
+```
+argo-ephemeral-operator/
+├── api/v1alpha1/              # CRD and API types
+├── cmd/                       # Main application entry point
+├── internal/
+│   ├── argocd/               # ArgoCD gRPC client implementation
+│   ├── config/               # Configuration management
+│   └── controller/           # Reconciliation logic and state machine
+├── config/                    # Kubernetes manifests
+│   ├── crd/                  # Custom Resource Definition
+│   ├── rbac/                 # Role-Based Access Control
+│   ├── manager/              # Operator deployment
+│   └── samples/              # Example resources
+├── Dockerfile                 # Multi-stage container build
+├── Makefile                   # Build and deployment automation
+└── .github/workflows/         # CI/CD pipeline
+```
+
 ## Contributing
 
-Contributions are welcome! This project follows:
-
-- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
-- **DRY (Don't Repeat Yourself)**: Code reuse and abstraction where appropriate
-- **YAGNI (You Aren't Gonna Need It)**: Only implement what's necessary
+Contributions are welcome! Please ensure your code follows the established patterns and principles.
 
 ## License
 
