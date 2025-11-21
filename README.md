@@ -310,6 +310,68 @@ spec:
 
 See `examples/with-secrets.yaml` for a complete example.
 
+### Injecting ConfigMaps
+
+Similar to secrets, you can inject ConfigMaps with environment-specific configuration (service endpoints, feature flags, etc.):
+
+**Copy from existing namespace**:
+
+```yaml
+spec:
+  configMaps:
+  - name: shared-config
+    sourceNamespace: shared-configs
+```
+
+**Create inline** (recommended for env-specific values):
+
+```yaml
+spec:
+  configMaps:
+  - name: app-config
+    data:
+      DATABASE_HOST: "postgres.databases.svc.cluster.local"
+      DATABASE_PORT: "5432"
+      REDIS_HOST: "redis.cache.svc"
+      API_ENDPOINT: "https://api-dev.example.com"
+      LOG_LEVEL: "debug"
+```
+
+**Your deployments use these ConfigMaps**:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        envFrom:
+        - configMapRef:
+            name: app-config  # Injected by operator
+```
+
+This approach works with **any source type** (Helm, Kustomize, plain YAML) and keeps your Git repository clean from environment-specific values.
+
+**⚠️ Important Limitations**
+
+The argo-ephemeral-operator is designed for **cloud-native applications** following **GitOps principles** and deployed with **ArgoCD**. 
+
+**This operator CANNOT override configuration if**:
+- Environment variables are **hardcoded** in your Deployment YAML files (e.g., `env: - name: DB_HOST value: "prod-db"`)
+- Configuration is **embedded in application code** instead of externalized
+- Applications don't use ConfigMaps or Secrets for configuration
+
+**For the operator to work correctly**, your applications must:
+- ✅ Use `envFrom` with ConfigMaps/Secrets references
+- ✅ Externalize all environment-specific configuration
+- ✅ Be designed for cloud-native deployment patterns
+
+**If your application has hardcoded configuration**, you must refactor it to use ConfigMaps/Secrets before using ephemeral environments. This is a best practice for cloud-native applications regardless of ephemeral environments.
+
+See `examples/with-configmaps.yaml` for a complete example.
+
 ### Deleting an Ephemeral Application
 
 Ephemeral applications are automatically deleted when they expire, but you can manually delete them:

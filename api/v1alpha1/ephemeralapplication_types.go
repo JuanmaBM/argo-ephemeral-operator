@@ -33,9 +33,31 @@ type EphemeralApplicationSpec struct {
 	// +optional
 	Secrets []SecretReference `json:"secrets,omitempty"`
 
+	// ConfigMaps to copy from other namespaces or create inline
+	// Useful for injecting environment-specific configuration
+	// +optional
+	ConfigMaps []ConfigMapReference `json:"configMaps,omitempty"`
+
 	// SyncPolicy defines how the application should be synced
 	// +optional
 	SyncPolicy *SyncPolicy `json:"syncPolicy,omitempty"`
+}
+
+// ConfigMapReference defines a configmap to copy or create
+type ConfigMapReference struct {
+	// Name of the configmap
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// SourceNamespace where the configmap exists (for copying)
+	// Mutually exclusive with Data
+	// +optional
+	SourceNamespace string `json:"sourceNamespace,omitempty"`
+
+	// Data to create a new configmap inline
+	// Mutually exclusive with SourceNamespace
+	// +optional
+	Data map[string]string `json:"data,omitempty"`
 }
 
 // SecretReference defines a secret to copy from another namespace
@@ -115,6 +137,10 @@ type EphemeralApplicationStatus struct {
 	// Format: "source-ns/source-name -> target-name"
 	// +optional
 	CopiedSecrets []string `json:"copiedSecrets,omitempty"`
+
+	// CopiedConfigMaps contains the list of configmaps that were copied
+	// +optional
+	CopiedConfigMaps []string `json:"copiedConfigMaps,omitempty"`
 }
 
 // EphemeralApplicationPhase represents the phase of an ephemeral application
