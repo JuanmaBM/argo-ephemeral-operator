@@ -55,6 +55,32 @@ spec:
                 description: 'NamespaceName is the name for the ephemeral namespace
                   If not provided, a random name will be generated: ephemeral-{random}'
                 type: string
+              secrets:
+                description: Secrets to copy from other namespaces into the ephemeral
+                  namespace
+                items:
+                  properties:
+                    name:
+                      description: Name of the secret in the source namespace
+                      type: string
+                    sourceNamespace:
+                      description: SourceNamespace where the secret exists
+                      type: string
+                    targetName:
+                      description: TargetName is the optional name for the secret in
+                        the target namespace. If not specified, uses the same name as
+                        the source
+                      type: string
+                    values:
+                      additionalProperties:
+                        type: string
+                      description: Values to create secret inline as key-value pairs.
+                        Mutually exclusive with SourceNamespace
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               path:
                 description: Path is the path within the Git repository
                 type: string
@@ -104,6 +130,12 @@ spec:
                 description: ArgoApplicationName is the name of the ArgoCD Application
                   created
                 type: string
+              copiedSecrets:
+                description: 'CopiedSecrets contains the list of secrets that were
+                  copied. Format: source-ns/source-name -> target-name'
+                items:
+                  type: string
+                type: array
               conditions:
                 description: Conditions represent the latest available observations
                   of the application's state

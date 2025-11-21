@@ -21,7 +21,7 @@ spec:
       serviceAccountName: argo-ephemeral-operator-controller-manager
       containers:
       - name: manager
-        image: quay.io/jbarea/argo-ephemeral-operator:0.2.0
+        image: quay.io/jbarea/argo-ephemeral-operator:0.3.1
         imagePullPolicy: IfNotPresent
         command:
         - /manager

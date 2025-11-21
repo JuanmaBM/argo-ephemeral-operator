@@ -13,7 +13,7 @@ spec:
   targetRevision: HEAD
   
   # Expira en 5 minutos
-  expirationDate: "2025-11-04T09:18:00Z"
+  expirationDate: "2025-11-21T15:59:00Z"
   
   # Nombre del namespace (opcional, si no se especifica se genera automáticamente como ephemeral-{random})
   # namespaceName: my-custom-namespace

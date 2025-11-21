@@ -117,6 +117,12 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 		return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "Failed to create namespace", err)
 	}
 
+	// Copy secrets to the ephemeral namespace
+	if err := r.copySecrets(ctx, ephApp, namespace); err != nil {
+		logger.Error(err, "failed to copy secrets")
+		return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "Failed to copy secrets", err)
+	}
+
 	// Build and create ArgoCD Application
 	argoApp, err := r.ArgoClient.CreateApplication(ctx, &application.ApplicationCreateRequest{
 		Application: &v1alpha1.Application{
@@ -153,6 +159,7 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 	ephApp.Status.Namespace = namespace
 	ephApp.Status.ArgoApplicationName = argoApp.Name
 	ephApp.Status.Message = "ArgoCD application created successfully"
+	ephApp.Status.CopiedSecrets = r.buildCopiedSecretsList(ephApp.Spec.Secrets)
 	r.setCondition(ephApp, "Ready", metav1.ConditionFalse, "Creating", "Creating ephemeral environment")
 
 	if err := r.Status().Update(ctx, ephApp); err != nil {

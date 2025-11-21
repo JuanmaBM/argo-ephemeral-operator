@@ -28,9 +28,35 @@ type EphemeralApplicationSpec struct {
 	// +optional
 	NamespaceName string `json:"namespaceName,omitempty"`
 
+	// Secrets to copy from other namespaces into the ephemeral namespace
+	// Allows applications to access shared credentials (databases, APIs, etc.)
+	// +optional
+	Secrets []SecretReference `json:"secrets,omitempty"`
+
 	// SyncPolicy defines how the application should be synced
 	// +optional
 	SyncPolicy *SyncPolicy `json:"syncPolicy,omitempty"`
+}
+
+// SecretReference defines a secret to copy from another namespace
+type SecretReference struct {
+	// Name of the secret in the source namespace
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// SourceNamespace where the secret exists
+	// +kubebuilder:validation:Required
+	SourceNamespace string `json:"sourceNamespace"`
+
+	// TargetName is the optional name for the secret in the target namespace
+	// If not specified, uses the same name as the source
+	// +optional
+	TargetName string `json:"targetName,omitempty"`
+
+	// Value is the value of the secret to be used in the ephemeral namespace
+	// If not specified, the secret will be copied as is using the secret from the SourceNamespace
+	// +optional
+	Values map[string]string `json:"values,omitempty"`
 }
 
 // SyncPolicy defines the sync behavior
@@ -84,6 +110,11 @@ type EphemeralApplicationStatus struct {
 	// LastSyncTime is the last time the application was synced
 	// +optional
 	LastSyncTime *metav1.Time `json:"lastSyncTime,omitempty"`
+
+	// CopiedSecrets contains the list of secrets that were copied
+	// Format: "source-ns/source-name -> target-name"
+	// +optional
+	CopiedSecrets []string `json:"copiedSecrets,omitempty"`
 }
 
 // EphemeralApplicationPhase represents the phase of an ephemeral application
