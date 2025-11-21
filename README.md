@@ -175,6 +175,141 @@ kubectl get ephapp my-feature-branch -o jsonpath='{.spec.expirationDate}'
 
 The controller will detect the change in the next reconciliation cycle and update the expiration accordingly.
 
+### Injecting Secrets
+
+Ephemeral environments often need access to shared resources (databases, APIs, caches). Instead of hardcoding credentials in Git repositories, you can inject secrets into the ephemeral namespace.
+
+#### Deployment Scenarios
+
+**Scenario 1: Same Cluster Deployment**
+
+If you deploy ephemeral environments in the **same cluster** where your production/shared services run, you can directly copy secrets from the namespaces where those services exist:
+
+```yaml
+spec:
+  secrets:
+  # Copy from the namespace where PostgreSQL is running
+  - name: postgres-credentials
+    sourceNamespace: databases
+  
+  # Copy from the namespace where Redis is running
+  - name: redis-password
+    sourceNamespace: cache
+  
+  # Copy from the namespace where Kafka is running
+  - name: kafka-config
+    sourceNamespace: messaging
+```
+
+This allows your ephemeral apps to use the same databases, queues, and services as your other environments.
+
+**Scenario 2: Dedicated Ephemeral Cluster (Recommended)**
+
+If you use a **dedicated cluster for ephemeral environments**, the best practice is to create a centralized namespace (e.g., `shared-secrets`) containing all the secrets your ephemeral applications might need:
+
+```yaml
+# One-time setup: Create shared-secrets namespace with all credentials
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shared-secrets
+---
+# Add all shared secrets here
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-dev
+  namespace: shared-secrets
+data:
+  url: <base64-encoded-url>
+  username: <base64-encoded-username>
+  password: <base64-encoded-password>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-dev
+  namespace: shared-secrets
+# ... more secrets
+```
+
+Then, all EphemeralApplications copy from this centralized namespace:
+
+```yaml
+spec:
+  secrets:
+  - name: postgres-dev
+    sourceNamespace: shared-secrets
+  - name: redis-dev
+    sourceNamespace: shared-secrets
+  - name: api-keys-dev
+    sourceNamespace: shared-secrets
+```
+
+**Benefits of the centralized approach**:
+- ✅ Single place to manage all credentials for ephemeral environments
+- ✅ Easy to rotate secrets (update once, affects all future ephemeral envs)
+- ✅ Clear separation between production and ephemeral credentials
+- ✅ Simplified RBAC (operator only needs access to one namespace)
+
+#### Secret Injection Methods
+
+**1. Copy from existing namespace**:
+
+```yaml
+spec:
+  secrets:
+  - name: postgres-credentials
+    sourceNamespace: shared-secrets
+  - name: api-keys
+    sourceNamespace: shared-secrets
+    targetName: external-api-keys  # Optional: rename in target
+```
+
+**2. Create inline** (useful for test data, non-sensitive config):
+
+```yaml
+spec:
+  secrets:
+  - name: test-config
+    values:
+      environment: "ephemeral-test"
+      log-level: "debug"
+      feature-flags: "new-ui:true,beta:false"
+```
+
+**How it works**:
+1. Secrets are copied/created **before** ArgoCD deploys your application
+2. Your deployments reference these secrets (already defined in your Git repo)
+3. Secrets are automatically cleaned up when the namespace is deleted
+
+**Example deployment in your Git repository**:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials  # Injected by operator
+              key: url
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: redis-creds
+              key: host
+```
+
+See `examples/with-secrets.yaml` for a complete example.
+
 ### Deleting an Ephemeral Application
 
 Ephemeral applications are automatically deleted when they expire, but you can manually delete them:
@@ -299,6 +434,38 @@ spec:
   targetRevision: dev/john-doe
   expirationDate: "2025-11-01T09:00:00Z"  # Expires in 2 weeks
   namespaceName: dev-john-doe
+```
+
+### Example 4: With Secret Injection
+
+```yaml
+apiVersion: ephemeral.argo.io/v1alpha1
+kind: EphemeralApplication
+metadata:
+  name: app-with-secrets
+spec:
+  repoURL: https://github.com/company/app.git
+  path: k8s
+  targetRevision: main
+  expirationDate: "2025-11-05T18:00:00Z"
+  
+  # Copy shared secrets
+  secrets:
+  - name: postgres-credentials
+    sourceNamespace: shared-databases
+  - name: redis-password
+    sourceNamespace: shared-cache
+  
+  # Create test secrets inline
+  - name: test-api-keys
+    values:
+      api-key: "test-key-123"
+      api-secret: "test-secret-456"
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
 ```
 
 ## Troubleshooting
