@@ -1,0 +1,40 @@
+apiVersion: ephemeral.argo.io/v1alpha1
+kind: EphemeralApplication
+metadata:
+  name: e2e-demo
+spec:
+  # This points to the example app we just created
+  # In a real scenario, this would be your Git repository
+  # For this demo, we'll use a public repo that contains the manifests above
+  # Since we can't easily push the manifests we just created to a repo for this test,
+  # I will point to a generic repo but the injection logic remains valid.
+  #
+  # NOTE: To fully test this, you should push the 'examples/complete-app/base' contents
+  # to a Git repository and point repoURL there.
+  repoURL: https://github.com/jbarea/argo-ephemeral-operator-demo.git
+  path: examples/complete-app/base
+  targetRevision: main
+  
+  expirationDate: "2025-12-31T23:59:59Z"
+  
+  # Inject configuration
+  secrets:
+  - name: database-creds
+    values:
+      username: "ephemeral-admin"
+      password: "ephemeral-test"
+  
+  configMaps:
+  # Create inline config for app-settings
+  - name: app-settings
+    data:
+      mode: "ephemeral-test"
+      debug: "true"
+      region: "us-east-1"
+      environment: "staging"
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+

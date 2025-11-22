@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      containers:
+      - name: web
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        env:
+        # Environment variables that will be populated from injected resources
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-creds
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-creds
+              key: password
+        - name: APP_REGION
+          valueFrom:
+            configMapRef:
+              name: global-config
+              key: region
+        - name: APP_MODE
+          valueFrom:
+            configMapRef:
+              name: app-settings
+              key: mode
+        # Command to display env vars in logs for verification
+        command: ["/bin/sh", "-c"]
+        args:
+          - echo "Starting app...";
+            echo "DB_USERNAME=$DB_USERNAME";
+            echo "DB_PASSWORD=$DB_PASSWORD";
+            echo "APP_REGION=$APP_REGION";
+            echo "APP_MODE=$APP_MODE";
+            nginx -g 'daemon off;';
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app
+spec:
+  selector:
+    app: demo-app
+  ports:
+  - port: 80
+    targetPort: 80
+
