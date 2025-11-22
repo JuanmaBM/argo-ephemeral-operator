@@ -15,7 +15,7 @@ spec:
   path: examples/complete-app/base
   targetRevision: main
   
-  expirationDate: "2025-11-22T17:35:00Z"
+  expirationDate: "2025-11-22T18:05:00Z"
   
   # Inject configuration
   secrets:

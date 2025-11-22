@@ -3,22 +3,14 @@ kind: EphemeralApplication
 metadata:
   name: test-guestbook
 spec:
-  # Repositorio de ejemplo de ArgoCD
   repoURL: https://github.com/argoproj/argocd-example-apps.git
   
-  # Path del guestbook
   path: guestbook
   
-  # Branch o tag
   targetRevision: HEAD
   
-  # Expira en 5 minutos
   expirationDate: "2025-11-21T15:59:00Z"
   
-  # Nombre del namespace (opcional, si no se especifica se genera automáticamente como ephemeral-{random})
-  # namespaceName: my-custom-namespace
-  
-  # Sincronización automática
   syncPolicy:
     automated:
       prune: true

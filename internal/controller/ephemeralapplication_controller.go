@@ -129,6 +129,9 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 		return r.updateStatusWithError(ctx, ephApp, ephemeralv1alpha1.PhaseFailed, "Failed to copy configmaps", err)
 	}
 
+	// Build ignore differences for injected resources
+	ignoreDiffs := argocd.BuildIgnoreDifferences(ephApp)
+
 	// Build and create ArgoCD Application
 	argoApp, err := r.ArgoClient.CreateApplication(ctx, &application.ApplicationCreateRequest{
 		Application: &v1alpha1.Application{
@@ -151,7 +154,11 @@ func (r *EphemeralApplicationReconciler) handlePendingPhase(ctx context.Context,
 						Prune:    true,
 						SelfHeal: true,
 					},
+					SyncOptions: v1alpha1.SyncOptions{
+						"RespectIgnoreDifferences=true",
+					},
 				},
+				IgnoreDifferences: ignoreDiffs,
 			},
 		},
 	})
