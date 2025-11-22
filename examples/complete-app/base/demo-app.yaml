@@ -33,14 +33,19 @@ spec:
               key: password
         - name: APP_REGION
           valueFrom:
-            configMapRef:
+            configMapKeyRef:
               name: global-config
               key: region
         - name: APP_MODE
           valueFrom:
-            configMapRef:
-              name: app-settings
+            configMapKeyRef:
+              name: global-config
               key: mode
+        - name: APP_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: global-config
+              key: environment
         # Command to display env vars in logs for verification
         command: ["/bin/sh", "-c"]
         args:
@@ -49,6 +54,7 @@ spec:
             echo "DB_PASSWORD=$DB_PASSWORD";
             echo "APP_REGION=$APP_REGION";
             echo "APP_MODE=$APP_MODE";
+            echo "APP_ENVIRONMENT=$APP_ENVIRONMENT";
             nginx -g 'daemon off;';
 ---
 apiVersion: v1
@@ -61,4 +67,23 @@ spec:
   ports:
   - port: 80
     targetPort: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-creds
+stringData:
+  username: "admin"
+  password: "super-secret-password"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-config
+data:
+  region: "eu-west-1"
+  environment: "production"
+  mode: "stable"
+  debug: "false"
+
 

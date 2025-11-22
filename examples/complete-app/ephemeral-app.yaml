@@ -11,11 +11,11 @@ spec:
   #
   # NOTE: To fully test this, you should push the 'examples/complete-app/base' contents
   # to a Git repository and point repoURL there.
-  repoURL: https://github.com/jbarea/argo-ephemeral-operator-demo.git
+  repoURL: https://github.com/JuanmaBM/argo-ephemeral-operator.git
   path: examples/complete-app/base
   targetRevision: main
   
-  expirationDate: "2025-12-31T23:59:59Z"
+  expirationDate: "2025-11-22T17:35:00Z"
   
   # Inject configuration
   secrets:
@@ -26,7 +26,7 @@ spec:
   
   configMaps:
   # Create inline config for app-settings
-  - name: app-settings
+  - name: global-config
     data:
       mode: "ephemeral-test"
       debug: "true"
