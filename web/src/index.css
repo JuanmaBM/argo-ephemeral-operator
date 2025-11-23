@@ -1,0 +1,19 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "RedHatDisplay", "Overpass", overpass, helvetica, arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: "RedHatMono", "Liberation Mono", Consolas, Monaco, 'Courier New', monospace;
+}
+
+#root {
+  height: 100vh;
+}
+

@@ -1,5 +1,7 @@
-# Image URL to use all building/pushing image targets
-IMG ?= argo-ephemeral-operator:latest
+# Image URLs to use for building/pushing image targets
+IMG_OPERATOR ?= argo-ephemeral-operator:latest
+IMG_API ?= argo-ephemeral-api:latest
+IMG_UI ?= argo-ephemeral-ui:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -38,20 +40,66 @@ test: fmt vet ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: fmt vet ## Build manager binary.
+build: build-operator build-api ## Build all binaries.
+
+.PHONY: build-operator
+build-operator: fmt vet ## Build operator binary.
 	go build -o bin/manager cmd/main.go
 
-.PHONY: run
-run: fmt vet ## Run from your host.
+.PHONY: build-api
+build-api: fmt vet ## Build API server binary.
+	go build -o bin/api-server cmd/api/main.go
+
+.PHONY: build-ui
+build-ui: ## Build React UI.
+	cd web && npm install && npm run build
+
+.PHONY: run-operator
+run-operator: fmt vet ## Run operator from your host.
 	go run cmd/main.go
 
+.PHONY: run-api
+run-api: fmt vet ## Run API server from your host.
+	go run cmd/api/main.go --port=8080
+
+.PHONY: run-ui
+run-ui: ## Run UI in development mode.
+	cd web && npm run dev
+
+.PHONY: run
+run: run-operator ## Alias for run-operator (backward compatibility).
+
+##@ Docker
+
 .PHONY: docker-build
-docker-build: ## Build docker image.
-	docker build -t ${IMG} .
+docker-build: docker-build-operator docker-build-api docker-build-ui ## Build all docker images.
+
+.PHONY: docker-build-operator
+docker-build-operator: ## Build operator docker image.
+	docker build -t ${IMG_OPERATOR} -f Dockerfile .
+
+.PHONY: docker-build-api
+docker-build-api: ## Build API server docker image.
+	docker build -t ${IMG_API} -f Dockerfile.api .
+
+.PHONY: docker-build-ui
+docker-build-ui: build-ui ## Build UI docker image.
+	docker build -t ${IMG_UI} -f Dockerfile.ui .
 
 .PHONY: docker-push
-docker-push: ## Push docker image.
-	docker push ${IMG}
+docker-push: docker-push-operator docker-push-api docker-push-ui ## Push all docker images.
+
+.PHONY: docker-push-operator
+docker-push-operator: ## Push operator docker image.
+	docker push ${IMG_OPERATOR}
+
+.PHONY: docker-push-api
+docker-push-api: ## Push API server docker image.
+	docker push ${IMG_API}
+
+.PHONY: docker-push-ui
+docker-push-ui: ## Push UI docker image.
+	docker push ${IMG_UI}
 
 ##@ Deployment
 
@@ -64,21 +112,50 @@ uninstall: ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	kubectl delete -f config/crd/bases/
 
 .PHONY: deploy
-deploy: ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: deploy-all ## Deploy all components (alias for deploy-all).
+
+.PHONY: deploy-all
+deploy-all: install ## Deploy all components (operator, API, UI) to K8s cluster.
+	kubectl apply -f config/manager/namespace.yaml
+	kubectl apply -f config/api/
+	kubectl apply -f config/ui/
+
+.PHONY: deploy-operator
+deploy-operator: install ## Deploy only the operator to K8s cluster.
 	kubectl apply -f config/manager/namespace.yaml
 	kubectl apply -f config/rbac/service_account.yaml
 	kubectl apply -f config/rbac/role.yaml
 	kubectl apply -f config/rbac/role_binding.yaml
-	kubectl apply -f config/crd/bases/
 	kubectl apply -f config/manager/deployment.yaml
 
+.PHONY: deploy-api
+deploy-api: ## Deploy only the API server to K8s cluster.
+	kubectl apply -f config/api/
+
+.PHONY: deploy-ui
+deploy-ui: ## Deploy only the UI to K8s cluster.
+	kubectl apply -f config/ui/
+
 .PHONY: undeploy
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
+undeploy: ## Undeploy all components from K8s cluster.
+	kubectl delete -f config/ui/ --ignore-not-found=true
+	kubectl delete -f config/api/ --ignore-not-found=true
+	kubectl delete -f config/manager/deployment.yaml --ignore-not-found=true
+
+.PHONY: undeploy-operator
+undeploy-operator: ## Undeploy only the operator from K8s cluster.
 	kubectl delete -f config/manager/deployment.yaml --ignore-not-found=true
 	kubectl delete -f config/rbac/role_binding.yaml --ignore-not-found=true
 	kubectl delete -f config/rbac/role.yaml --ignore-not-found=true
 	kubectl delete -f config/rbac/service_account.yaml --ignore-not-found=true
-	kubectl delete -f config/manager/namespace.yaml --ignore-not-found=true
+
+.PHONY: undeploy-api
+undeploy-api: ## Undeploy only the API server from K8s cluster.
+	kubectl delete -f config/api/ --ignore-not-found=true
+
+.PHONY: undeploy-ui
+undeploy-ui: ## Undeploy only the UI from K8s cluster.
+	kubectl delete -f config/ui/ --ignore-not-found=true
 
 ##@ Samples
 

@@ -1,0 +1,31 @@
+apiVersion: kustomization.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argo-ephemeral-operator-system
+
+resources:
+# Operator (existing)
+- ../../config/default
+
+# API Server
+- ../api/service-account.yaml
+- ../api/rbac.yaml
+- ../api/deployment.yaml
+- ../api/service.yaml
+
+# UI
+- ../ui/deployment.yaml
+- ../ui/service.yaml
+- ../ui/ingress.yaml
+
+images:
+- name: argo-ephemeral-operator
+  newName: argo-ephemeral-operator
+  newTag: latest
+- name: argo-ephemeral-api
+  newName: argo-ephemeral-api
+  newTag: latest
+- name: argo-ephemeral-ui
+  newName: argo-ephemeral-ui
+  newTag: latest
+
