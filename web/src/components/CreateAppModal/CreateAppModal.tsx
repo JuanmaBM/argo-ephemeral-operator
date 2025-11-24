@@ -27,8 +27,8 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
     namespace: 'default',
     repoURL: '',
     path: '',
-    targetRevision: 'main',
-    expirationDate: '',
+    targetRevision: 'HEAD',
+    expirationDateTime: '', // Formato datetime-local (YYYY-MM-DDTHH:mm)
     namespaceName: '',
     // Secrets
     secrets: [] as Array<{ name: string; sourceNamespace?: string; values?: string }>,
@@ -44,6 +44,11 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
 
   const handleSubmit = async () => {
     try {
+      // Convert datetime-local to RFC3339 (ISO 8601)
+      const expirationDate = formData.expirationDateTime 
+        ? new Date(formData.expirationDateTime).toISOString()
+        : '';
+      
       // Parse secrets
       const secrets = formData.secrets
         .filter((s) => s.name)
@@ -107,7 +112,7 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
           repoURL: formData.repoURL,
           path: formData.path,
           targetRevision: formData.targetRevision,
-          expirationDate: formData.expirationDate,
+          expirationDate: expirationDate,
           namespaceName: formData.namespaceName || undefined,
           secrets: secrets.length > 0 ? secrets : undefined,
           configMaps: configMaps.length > 0 ? configMaps : undefined,
@@ -130,8 +135,8 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
         namespace: 'default',
         repoURL: '',
         path: '',
-        targetRevision: 'main',
-        expirationDate: '',
+        targetRevision: 'HEAD',
+        expirationDateTime: '',
         namespaceName: '',
         secrets: [],
         configMaps: [],
@@ -146,7 +151,7 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
   };
 
   const isValid =
-    formData.name && formData.repoURL && formData.path && formData.expirationDate;
+    formData.name && formData.repoURL && formData.path && formData.expirationDateTime;
 
   const addSecret = () => {
     setFormData({
@@ -256,40 +261,44 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
             </FormGroup>
 
             <FormGroup label="Target Revision" fieldId="targetRevision">
-              <TextInput
-                type="text"
-                id="targetRevision"
-                placeholder="main"
-                value={formData.targetRevision}
-                onChange={(_, value) => setFormData({ ...formData, targetRevision: value })}
-              />
+              <div>
+                <p style={{ fontSize: '0.875rem', color: '#6a6e73', marginBottom: '0.5rem' }}>
+                  Git branch, tag, or commit SHA (HEAD for default branch)
+                </p>
+                <TextInput
+                  type="text"
+                  id="targetRevision"
+                  placeholder="HEAD"
+                  value={formData.targetRevision}
+                  onChange={(_, value) => setFormData({ ...formData, targetRevision: value })}
+                />
+              </div>
             </FormGroup>
 
             <FormGroup
               label="Expiration Date & Time"
               isRequired
-              fieldId="expirationDate"
+              fieldId="expirationDateTime"
             >
               <div>
                 <p style={{ fontSize: '0.875rem', color: '#6a6e73', marginBottom: '0.5rem' }}>
-                  When this environment should be automatically deleted (RFC3339 format)
+                  When this environment should be automatically deleted
                 </p>
                 <TextInput
                   isRequired
                   type="datetime-local"
-                  id="expirationDate"
-                  value={formData.expirationDate}
+                  id="expirationDateTime"
+                  value={formData.expirationDateTime}
                   onChange={(_, value) => {
-                    // Convert to RFC3339 format
-                    const date = new Date(value);
-                    const rfc3339 = date.toISOString();
-                    setFormData({ ...formData, expirationDate: rfc3339 });
+                    setFormData({ ...formData, expirationDateTime: value });
                   }}
                   placeholder={getDefaultExpiration()}
                 />
-                <small style={{ marginTop: '0.5rem', display: 'block' }}>
-                  Current value (RFC3339): {formData.expirationDate || 'Not set'}
-                </small>
+                {formData.expirationDateTime && (
+                  <small style={{ marginTop: '0.5rem', display: 'block', color: '#6a6e73' }}>
+                    Will be converted to: {new Date(formData.expirationDateTime).toISOString()}
+                  </small>
+                )}
               </div>
             </FormGroup>
 
