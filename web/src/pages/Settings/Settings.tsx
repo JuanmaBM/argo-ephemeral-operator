@@ -40,7 +40,7 @@ export const Settings: React.FC = () => {
     <>
       <PageSection variant="light">
         <Title headingLevel="h1" size="2xl">
-          Settings
+          Authentication
         </Title>
       </PageSection>
 

@@ -32,7 +32,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             heights={{ default: '36px' }}
           />
           <span style={{ marginLeft: '12px', fontSize: '1.2rem', fontWeight: 600 }}>
-            Argo Ephemeral
+            Argo Ephemeral Operator
           </span>
         </MastheadBrand>
       </MastheadMain>
@@ -55,7 +55,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               isActive={location.pathname === '/settings'}
               onClick={() => navigate('/settings')}
             >
-              Settings
+              Authentication
             </NavItem>
           </NavList>
         </Nav>
