@@ -10,7 +10,6 @@ import {
   Nav,
   NavList,
   NavItem,
-  Brand,
 } from '@patternfly/react-core';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -25,18 +24,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const Header = (
     <Masthead>
       <MastheadMain>
-        <MastheadBrand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <Brand
-            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🚀%3C/text%3E%3C/svg%3E"
-            alt="Argo Ephemeral"
-            heights={{ default: '36px' }}
+        <MastheadBrand onClick={() => navigate('/')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <img 
+            src="/logo.png" 
+            alt="Argo Ephemeral" 
+            style={{ height: '65px' }}
           />
-          <span style={{ marginLeft: '12px', fontSize: '1.2rem', fontWeight: 600 }}>
+          <span style={{ marginLeft: '12px', fontSize: '1.2rem', fontWeight: 600, color: '#ffffff' }}>
             Argo Ephemeral Operator
           </span>
         </MastheadBrand>
       </MastheadMain>
-      <MastheadContent>{/* Can add user menu, notifications, etc */}</MastheadContent>
+      <MastheadContent>{/* User menu, notifications */}</MastheadContent>
     </Masthead>
   );
 
@@ -55,7 +54,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               isActive={location.pathname === '/settings'}
               onClick={() => navigate('/settings')}
             >
-              Authentication
+              Settings
             </NavItem>
           </NavList>
         </Nav>
@@ -69,4 +68,3 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     </Page>
   );
 };
-

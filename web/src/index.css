@@ -17,3 +17,66 @@ code {
   height: 100vh;
 }
 
+/* Custom colors */
+.pf-v5-c-page__header {
+  background-color: #009485 !important;
+  border-bottom: none;
+}
+
+.pf-v5-c-masthead {
+  background-color: #009485 !important;
+}
+
+.pf-v5-c-page__sidebar {
+  background-color: #2E303E;
+  border-right: none;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  background-color: #009485;
+  border-color: #009485;
+}
+
+.pf-v5-c-button.pf-m-primary:hover {
+  background-color: #007a6d;
+}
+
+.pf-v5-c-nav__link.pf-m-current {
+  border-left: 3px solid #009485 !important;
+  border-inline-start: 3px solid #009485 !important;
+}
+
+.pf-v5-c-nav__link.pf-m-current::before {
+  display: none !important;
+}
+
+.pf-v5-c-nav__link.pf-m-current::after {
+  display: none !important;
+}
+
+/* Rounded borders */
+.pf-v5-c-card {
+  border-radius: 8px;
+}
+
+.pf-v5-c-button {
+  border-radius: 6px;
+}
+
+.pf-v5-c-form-control {
+  border-radius: 6px;
+}
+
+.pf-v5-c-modal-box {
+  border-radius: 12px;
+}
+
+.pf-v5-c-alert {
+  border-radius: 8px;
+}
+
+.pf-v5-c-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
