@@ -302,7 +302,7 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ isOpen, onClose 
               </div>
             </FormGroup>
 
-            <FormGroup label="Namespace Name (optional)" fieldId="namespaceName">
+            <FormGroup label="Generated Ephemeral Namespace Name (optional)" fieldId="namespaceName">
               <div>
                 <p style={{ fontSize: '0.875rem', color: '#6a6e73', marginBottom: '0.5rem' }}>
                   Custom namespace name. If not provided, a random name will be generated.
