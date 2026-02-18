@@ -1,0 +1,25 @@
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /workspace
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build API server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o api-server cmd/api/main.go
+
+# Use distroless as minimal base image
+FROM gcr.io/distroless/static:nonroot
+
+WORKDIR /
+
+COPY --from=builder /workspace/api-server .
+
+USER 65532:65532
+
+ENTRYPOINT ["/api-server"]
+

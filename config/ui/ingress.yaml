@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-ephemeral-ui-ingress
+  namespace: argo-ephemeral-operator-system
+  annotations:
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Optional: for TLS
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ephemeral.yourdomain.com  # CHANGE THIS
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argo-ephemeral-ui-service
+            port:
+              number: 80
+  # Optional: TLS configuration
+  # tls:
+  # - hosts:
+  #   - ephemeral.yourdomain.com
+  #   secretName: ephemeral-ui-tls
+

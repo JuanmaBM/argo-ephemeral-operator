@@ -8,6 +8,8 @@ A Kubernetes/OpenShift operator written in Golang that uses ArgoCD to create and
 - **ArgoCD Integration**: Leverage ArgoCD's GitOps capabilities for application deployment
 - **Time-based Expiration**: Automatically remove environments after a specified expiration date
 - **Declarative API**: Simple Custom Resource Definition (CRD) for managing ephemeral applications
+- **REST API Server**: Go-based API server with Kubernetes ServiceAccount authentication for programmatic access
+- **Web UI**: React-based dashboard (PatternFly) for managing ephemeral environments visually
 - **Production Ready**: Built following SOLID, DRY, and YAGNI principles with comprehensive error handling
 
 ## How It Works
@@ -24,12 +26,47 @@ A Kubernetes/OpenShift operator written in Golang that uses ArgoCD to create and
 
 ## Architecture
 
-The operator follows clean architecture principles:
+The project is composed of three main components:
+
+### Operator (`cmd/main.go`)
+
+The core Kubernetes controller that watches `EphemeralApplication` custom resources and reconciles the desired state:
 
 - **API Layer** (`api/v1alpha1`): Custom Resource Definitions
 - **Controller Layer** (`internal/controller`): Reconciliation logic following Kubernetes controller patterns
 - **ArgoCD Client** (`internal/argocd`): Interface-based ArgoCD interaction (follows Interface Segregation Principle)
 - **Configuration** (`internal/config`): Environment-based configuration management
+
+### API Server (`cmd/api/main.go`)
+
+A REST API server that provides programmatic access to `EphemeralApplication` resources. It authenticates requests using Kubernetes ServiceAccount tokens (`TokenReview` API).
+
+**Endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/ephemeral-apps` | List all ephemeral applications |
+| `GET` | `/api/v1/ephemeral-apps/{name}?namespace=` | Get a single application |
+| `POST` | `/api/v1/ephemeral-apps/create` | Create a new application |
+| `PATCH` | `/api/v1/ephemeral-apps/{name}?namespace=` | Update an application (e.g. extend expiration) |
+| `DELETE` | `/api/v1/ephemeral-apps/{name}?namespace=` | Delete an application |
+| `GET` | `/api/v1/metrics` | Get environment metrics (totals, by phase, recent) |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+
+All `/api/v1/` endpoints require a valid `Authorization: Bearer <token>` header with a Kubernetes ServiceAccount token.
+
+### Web UI (`web/`)
+
+A React single-page application built with [PatternFly](https://www.patternfly.org/) that provides a visual dashboard for managing ephemeral environments. It communicates with the API server through an Nginx reverse proxy.
+
+**Pages:**
+
+- **Dashboard** (`/environments`): Lists all ephemeral environments with status, expiration, and metrics cards (total, active, creating, failed). Allows creating new environments via a modal form.
+- **Environment Detail** (`/environments/:name`): Shows full details of a single environment including status, namespace, repository, path, revision, expiration, and status messages.
+- **Settings** (`/settings`): Authentication page where users configure their Kubernetes ServiceAccount token (stored in `localStorage`).
+
+**Tech stack:** React 18, TypeScript, PatternFly 5, React Router, TanStack React Query, Axios, Vite.
 
 ## Prerequisites
 
@@ -38,7 +75,80 @@ The operator follows clean architecture principles:
 - ArgoCD authentication token
 - `kubectl` configured to access your cluster
 
-## Installation
+## Local Setup (Recommended for Development)
+
+The fastest way to get everything running locally is to use the provided `setup-local.sh` script. It provisions a minikube cluster, installs ArgoCD, builds all images, and deploys the operator, API server, and UI in one step.
+
+### Requirements
+
+| Tool | Version | Description |
+|------|---------|-------------|
+| [minikube](https://minikube.sigs.k8s.io/docs/start/) | Latest | Local Kubernetes cluster |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | v1.24+ | Kubernetes CLI |
+| [Go](https://go.dev/doc/install) | 1.24+ | Build operator and API server |
+| [Node.js](https://nodejs.org/) | 20+ | Build the Web UI (includes npm) |
+| Docker or Podman | Latest | Container runtime for building images |
+
+On Fedora/RHEL, Podman works out of the box. minikube will auto-detect the best available driver (KVM2 if `libvirt` is installed, Podman otherwise).
+
+### Full Installation
+
+```bash
+./setup-local.sh
+```
+
+This will:
+1. Check all prerequisites
+2. Create a minikube cluster (`argo-ephemeral-local`)
+3. Install ArgoCD (v2.14.20, matching the operator's `go.mod`)
+4. Build all container images (operator, API server, UI)
+5. Load images into minikube
+6. Install CRDs, RBAC, and deploy all components
+
+### Script Options
+
+```bash
+./setup-local.sh                # Full install (default)
+./setup-local.sh --skip-build   # Reuse existing images, deploy/redeploy everything
+./setup-local.sh --reload-images # Rebuild images, reload, and restart deployments
+./setup-local.sh --teardown     # Destroy the minikube cluster
+```
+
+### Accessing the Services
+
+After installation, use `kubectl port-forward` to access each service:
+
+```bash
+# ArgoCD UI (https://localhost:9090, user: admin)
+kubectl port-forward svc/argocd-server -n argocd 9090:443 &
+
+# Ephemeral Operator API (http://localhost:8080)
+kubectl port-forward svc/argo-ephemeral-api-service -n argo-ephemeral-operator-system 8080:8080 &
+
+# Ephemeral Operator UI (http://localhost:8888)
+kubectl port-forward svc/argo-ephemeral-ui-service -n argo-ephemeral-operator-system 8888:80 &
+```
+
+### Authenticating the Web UI
+
+The Web UI requires a Kubernetes ServiceAccount token. Create one and paste it in the Settings page (`http://localhost:8888/settings`):
+
+```bash
+# Create a ServiceAccount with permissions to manage EphemeralApplications
+kubectl create serviceaccount ephemeral-user -n default
+kubectl create clusterrolebinding ephemeral-user-binding \
+  --clusterrole=cluster-admin \
+  --serviceaccount=default:ephemeral-user
+
+# Generate a token (valid for 24h)
+kubectl create token ephemeral-user -n default --duration=24h
+```
+
+Copy the token output and paste it into the Settings page of the UI.
+
+## Manual Installation
+
+If you prefer to install components manually on an existing cluster, follow the steps below.
 
 ### 1. Install the CRD
 
@@ -85,7 +195,7 @@ kubectl apply -f my-secret.yaml
 ### 3. Deploy the Operator
 
 ```bash
-make deploy
+make deploy-operator
 ```
 
 Or manually:
@@ -98,11 +208,49 @@ kubectl apply -f config/rbac/role_binding.yaml
 kubectl apply -f config/manager/deployment.yaml
 ```
 
-### 4. Verify Installation
+### 4. Deploy the API Server
+
+```bash
+make deploy-api
+```
+
+Or manually:
+
+```bash
+kubectl apply -f config/api/
+```
+
+This deploys the API server with its ServiceAccount, RBAC (ClusterRole + ClusterRoleBinding), Deployment, and Service.
+
+### 5. Deploy the Web UI
+
+```bash
+make deploy-ui
+```
+
+Or manually:
+
+```bash
+kubectl apply -f config/ui/
+```
+
+This deploys the Nginx-based UI with its Deployment, Service, and Ingress. Edit `config/ui/ingress.yaml` to set your domain before applying.
+
+### 6. Deploy All Components at Once
+
+```bash
+make deploy
+```
+
+This runs `make install` (CRDs) followed by deploying the namespace, API server, and UI.
+
+### 7. Verify Installation
 
 ```bash
 kubectl get pods -n argo-ephemeral-operator-system
 ```
+
+You should see pods for the operator (`controller-manager`), API server (`argo-ephemeral-api`), and UI (`argo-ephemeral-ui`).
 
 ## Usage
 
@@ -403,18 +551,25 @@ The operator is configured through environment variables:
 
 ### Prerequisites
 
-- Go 1.21+
-- Docker (for building images)
+- Go 1.24+
+- Node.js 20+ and npm (for the Web UI)
+- Docker or Podman (for building images)
 - Access to a Kubernetes cluster
 
 ### Building
 
 ```bash
-# Build the binary
+# Build operator and API server binaries
 make build
 
-# Run locally (requires kubeconfig)
-make run
+# Build only the operator
+make build-operator
+
+# Build only the API server
+make build-api
+
+# Build the Web UI (npm install + vite build)
+make build-ui
 
 # Run tests
 make test
@@ -426,26 +581,41 @@ make fmt
 make vet
 ```
 
-### Building Docker Image
+### Building Docker Images
 
 ```bash
-make docker-build IMG=your-registry/argo-ephemeral-operator:tag
-make docker-push IMG=your-registry/argo-ephemeral-operator:tag
+# Build all images (operator, API, UI)
+make docker-build
+
+# Or individually
+make docker-build-operator
+make docker-build-api
+make docker-build-ui
 ```
 
-### Running Locally
+### Running Components Locally (Development Mode)
+
+Each component can be run individually from your host during development:
 
 ```bash
-# Set required environment variables
+# Set required environment variables for the operator
 export ARGO_SERVER="argocd-server.argocd.svc.cluster.local"
 export ARGO_PORT="443"
 export ARGO_USERNAME="admin"
 export ARGO_PASSWORD="your-argocd-password"
 export ARGO_NAMESPACE="argocd"
 
-# Run the operator
-make run
+# Run the operator (requires kubeconfig)
+make run-operator
+
+# Run the API server on port 8080 (requires kubeconfig)
+make run-api
+
+# Run the UI in Vite dev mode on port 3000 (proxies /api to localhost:8080)
+make run-ui
 ```
+
+When running the UI in development mode (`make run-ui`), Vite proxies all `/api` requests to `http://localhost:8080`, so make sure the API server is also running.
 
 ## Examples
 
@@ -573,20 +743,39 @@ kubectl auth can-i create applications.argoproj.io --as=system:serviceaccount:ar
 
 ```
 argo-ephemeral-operator/
-├── api/v1alpha1/              # CRD and API types
-├── cmd/                       # Main application entry point
+├── api/v1alpha1/              # CRD types and deepcopy
+├── cmd/
+│   ├── main.go               # Operator entry point
+│   └── api/main.go           # API server entry point
 ├── internal/
+│   ├── apiserver/            # REST API server
+│   │   ├── auth/             # Kubernetes TokenReview authenticator
+│   │   ├── handlers/         # HTTP handlers (CRUD, metrics, health)
+│   │   └── middleware/       # CORS, logging middleware
 │   ├── argocd/               # ArgoCD gRPC client implementation
 │   ├── config/               # Configuration management
 │   └── controller/           # Reconciliation logic and state machine
+├── web/                       # React Web UI (PatternFly)
+│   ├── src/
+│   │   ├── api/              # API client (Axios) and TypeScript types
+│   │   ├── components/       # Reusable UI components
+│   │   ├── hooks/            # React Query hooks
+│   │   └── pages/            # Dashboard, EnvironmentDetail, Settings
+│   ├── package.json
+│   └── vite.config.ts        # Vite config (dev proxy to API on :8080)
 ├── config/                    # Kubernetes manifests
 │   ├── crd/                  # Custom Resource Definition
-│   ├── rbac/                 # Role-Based Access Control
-│   ├── manager/              # Operator deployment
+│   ├── rbac/                 # Operator RBAC
+│   ├── manager/              # Operator deployment + namespace
+│   ├── api/                  # API server deployment, RBAC, service
+│   ├── ui/                   # UI deployment, service, ingress
 │   └── samples/              # Example resources
-├── Dockerfile                 # Multi-stage container build
+├── Dockerfile                 # Operator image (multi-stage)
+├── Dockerfile.api             # API server image (multi-stage)
+├── Dockerfile.ui              # UI image (Node build + Nginx)
+├── nginx.conf                 # Nginx config (serves UI + proxies /api)
 ├── Makefile                   # Build and deployment automation
-└── .github/workflows/         # CI/CD pipeline
+└── setup-local.sh             # One-command local setup with minikube
 ```
 
 ## Contributing
